@@ -5,25 +5,29 @@
 #InstallMouseHook
 
 SendMode Event
-SetKeyDelay 100
+SetKeyDelay 10
 
-;; Game Configuration
+;; Configuration
 
-jaWindow := "OpenJK (MP)"
+jaWindow := "Jedi Knight�: Jedi Academy (MP)"
 
 ; Make sure you don't map any keys in-game to Alt or [.
 
 bind_toggle := "Alt"
+bind_swingBlock := "["
 
 bind_attack := "LButton"
 bind_block := "RButton"
-bind_walk := "Shift" ; Make sure "Always Run" is set to "Yes" inside the game.
+bind_run := "Space" ; Make sure "Always Run" is set to "No" inside the game.
 
 ;; Main Logic
 
-isDuelMode := false
+isDuelMode := true
+isRunToggled := false
 
-~*Ctrl::Suspend
+; yellowComboDelay := 550 ; ~100 half swing ~160 upper diagonal
+; purpleComboDelay := 600
+; redComboDelay := 700
 
 ; Hotkey, *%bind_toggle%, label_toggle
 
@@ -35,9 +39,13 @@ isDuelMode := false
 ; Hotkey, %bind_block% Up, label_block_release
 ; Hotkey %bind_walk% Up, label_walk_release
 
-Attack() {
+StartAttacking() {
   global bind_attack
   Send, {%bind_attack% DownTemp}
+}
+
+FinishAttacking() {
+  global bind_attack
   Send, {%bind_attack% Up}
 }
 
@@ -46,65 +54,96 @@ Guard() {
   Send, {%bind_block% Down}
 }
 
-DropGuard() {
+CancelGuard() {
   global bind_block
   Send, {%bind_block% Up}
 }
 
-Walk() {
-  global bind_walk
-  Send, {%bind_walk% Down}
+Run() {
+  global bind_run
+  Send, {%bind_run% Down}
 }
 
-CancelWalk() {
-  global bind_walk
-  Send, {%bind_walk% Up}
+CancelRun() {
+  global bind_run
+  Send, {%bind_run% Up}
 }
 
+ReleaseAllButtons() {
+  CancelGuard()
+  CancelRun()
+  isRunToggled := false
+}
+
+WinActivate, %jaWindow%
+WinWaitActive, %jaWindow%
+Sleep, 100
+Guard()
+
+; TODO: Get this dynamically from bind_toggle
 ~*Alt::
+  Suspend
   ;if (!WinActive(jaWindow))
   ;  return
   isDuelMode := !isDuelMode
   if (!isDuelMode) {
-    DropGuard()
-    CancelWalk()
+    ReleaseAllButtons()
   } else {
     Guard()
-    Walk()
   }
   return
 
 ; Swing-block with one key.
-; TODO: Swing-block combo while held.
+; TODO: Get this dynamically from bind_swingBlock
 ~*[::
-  if (!isDuelMode)
-    return
-  DropGuard()
-  Sleep, 50
-  Attack()
-  Sleep, 50
+  CancelGuard()
+  StartAttacking()
+  FinishAttacking()
   Guard()
   return
+  
+~*[ Up::
+  Sleep, 10
+  if (isRunToggled) {
+    isRunToggled := false
+    CancelRun()
+  }
 
 ; Always block in duel mode.
 ; TODO: Get this dynamically from bind_block
 ~*RButton Up::
-  if (!isDuelMode)
-    return
-  Sleep, 100
+  Sleep, 10
+  if (isRunToggled) {
+    isRunToggled := false
+    CancelRun()
+  }
   Guard()
   return
   
-; Always walk in duel mode.
-; TODO: Get this dynamically from bind_walk
-~*Shift Up::
-  if (!isDuelMode)
-    return
-  Sleep, 100
-  Walk()
+; In case of a manual attack, cancel running.
+; TODO: Get this dynamically from bind_attack
+~*LButton Up::
+  Sleep, 10
+  if (isRunToggled) {
+    isRunToggled := false
+    CancelRun()
+  }
+  return
+  
+; Toggle run on/off instead of having to keep the run button pressed.
+; TODO: Get this dynamically from bind_run
+~*Space Up::
+  Sleep, 10
+  isRunToggled := !isRunToggled
+  if (isRunToggled) {
+    CancelGuard()
+    Run()
+  } else {
+    CancelRun()
+    Guard()
+  }
   return
   
 OnExit:
-  DropGuard()
-  CancelWalk()
+  ReleaseAllButtons()
   return
